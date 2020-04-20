@@ -29,11 +29,11 @@ public class SelectionSquare : MonoBehaviour
     //To determine if we are clicking with left mouse or holding down left mouse
     private float delay = 0.3f;
     private float clickTime = 0f;
-    //The start and end coordinates of the square we are making
-    private Vector3 squareStartPos;
-    private Vector3 squareEndPos;
-    //If it was possible to create a square
-    private bool hasCreatedSquare;
+
+    //The start and end coordinates of the rectangle we are making
+    private Vector3 rectangleStartPos;
+    //If it was possible to create a rectangle
+    private bool hasCreatedRectangle;
     //The selection squares 4 corner positions
     private Vector3 TL, TR, BL, BR;
 
@@ -52,7 +52,7 @@ public class SelectionSquare : MonoBehaviour
         //Select one or several units by clicking or draging the mouse
         SelectUnits();
 
-        //Highlight by hovering with mouse above a unit which is not selected
+        //Highlight a single unit by hovering with mouse above a unit which is not selected
         HighlightUnit();
     }
 
@@ -61,65 +61,30 @@ public class SelectionSquare : MonoBehaviour
     //Select units with click or by draging the mouse
     void SelectUnits()
     {
-        //Are we clicking with left mouse or holding down left mouse
-        bool isClicking = false;
+        //Have we clicked with left mouse or are we holding down left mouse
+        bool hasClicked = false;
         bool isHoldingDown = false;
+        bool hasReleased = false;
 
-        //Click the mouse button
+        //Press down left mouse button
         if (Input.GetMouseButtonDown(0))
         {
             clickTime = Time.time;
 
-            //We dont yet know if we are drawing a square, but we need the first coordinate in case we do draw a square
-            RaycastHit hit;
-            //Fire ray from camera to the ground plane
-            if (Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out hit, 200f, 1 << 9))
-            {
-                //The corner position of the square
-                squareStartPos = hit.point;
-            }
+            //We dont yet know if we are drawing a rectangle, but we need the first coordinate in case we do draw a rectangle
+            rectangleStartPos = Input.mousePosition;
         }
-        //Release the mouse button
+        //Release left mouse button
         else if (Input.GetMouseButtonUp(0))
         {
             if (Time.time - clickTime <= delay)
             {
-                isClicking = true;
+                hasClicked = true;
             }
 
-            //Select all units within the square if we have created a square
-            if (hasCreatedSquare)
-            {
-                hasCreatedSquare = false;
-
-                //Deactivate the square selection image
-                selectionSquareTrans.gameObject.SetActive(false);
-
-                //Clear the list with selected unit
-                selectedUnits.Clear();
-
-                //Select the units
-                for (int i = 0; i < allUnits.Length; i++)
-                {
-                    GameObject currentUnit = allUnits[i];
-
-                    //Is this unit within the square
-                    if (IsWithinPolygon(currentUnit.transform.position))
-                    {
-                        currentUnit.GetComponent<MeshRenderer>().material = selectedMaterial;
-
-                        selectedUnits.Add(currentUnit);
-                    }
-                    //Otherwise deselect the unit if it's not in the square
-                    else
-                    {
-                        currentUnit.GetComponent<MeshRenderer>().material = normalMaterial;
-                    }
-                }
-            }
-
+            hasReleased = true;
         }
-        //Holding down the mouse button
+        //Hold down left mouse button
         else if (Input.GetMouseButton(0))
         {
             if (Time.time - clickTime > delay)
@@ -129,8 +94,8 @@ public class SelectionSquare : MonoBehaviour
         }
 
 
-        //Select one unit with left mouse and deselect all units with left mouse by clicking on what's not a unit
-        if (isClicking)
+        //Select one unit and/or deselect currently selected units by clicking on what's not a unit
+        if (hasClicked)
         {
             //Deselect all units
             for (int i = 0; i < selectedUnits.Count; i++)
@@ -162,32 +127,59 @@ public class SelectionSquare : MonoBehaviour
         //Drag the mouse to select all units within the square
         if (isHoldingDown)
         {
-            //Activate the square selection image
-            if (!selectionSquareTrans.gameObject.activeInHierarchy)
-            {
-                selectionSquareTrans.gameObject.SetActive(true);
-            }
-
-            //Get the latest coordinate of the square
-            squareEndPos = Input.mousePosition;
-
-            //Display the selection with a GUI image
+            //Display the rectangle with a GUI image
             DisplayRectangle();
 
             //Highlight the units within the selection square, but don't select the units
             //We select them when we have released the mouse button
-            if (hasCreatedSquare)
+            if (hasCreatedRectangle)
             {
                 for (int i = 0; i < allUnits.Length; i++)
                 {
                     GameObject currentUnit = allUnits[i];
 
-                    //Is this unit within the square
+                    //Is this unit within the rectangle
                     if (IsWithinPolygon(currentUnit.transform.position))
                     {
                         currentUnit.GetComponent<MeshRenderer>().material = highlightMaterial;
                     }
                     //Otherwise deactivate
+                    else
+                    {
+                        currentUnit.GetComponent<MeshRenderer>().material = normalMaterial;
+                    }
+                }
+            }
+        }
+
+
+        //We have released the mouse button and should select the units within the rectangle
+        if (hasReleased)
+        {
+            //Select all units within the rectangle if we have created a rectangle
+            if (hasCreatedRectangle)
+            {
+                hasCreatedRectangle = false;
+
+                //Deactivate the square selection image
+                selectionSquareTrans.gameObject.SetActive(false);
+
+                //Clear the list with selected unit
+                selectedUnits.Clear();
+
+                //Select the units that are within the rectangle
+                for (int i = 0; i < allUnits.Length; i++)
+                {
+                    GameObject currentUnit = allUnits[i];
+
+                    //Is this unit within the rectangle
+                    if (IsWithinPolygon(currentUnit.transform.position))
+                    {
+                        currentUnit.GetComponent<MeshRenderer>().material = selectedMaterial;
+
+                        selectedUnits.Add(currentUnit);
+                    }
+                    //Otherwise deselect the unit if it's not in the rectangle
                     else
                     {
                         currentUnit.GetComponent<MeshRenderer>().material = normalMaterial;
@@ -308,21 +300,24 @@ public class SelectionSquare : MonoBehaviour
     //Display the selection with a GUI rectangle
     void DisplayRectangle()
     {
-        //The start position of the rectangle is in 3d space, or the first coordinate will move
-        //as we move the camera which is not what we want
-        Vector3 squareStartScreen = Camera.main.WorldToScreenPoint(squareStartPos);
+        //Activate the border image
+        if (!selectionSquareTrans.gameObject.activeInHierarchy)
+        {
+            selectionSquareTrans.gameObject.SetActive(true);
+        }
 
-        squareStartScreen.z = 0f;
+        //Get the a corner coordinate of the rectangle, which is where the mouse currently is
+        Vector3 rectangleEndPos = Input.mousePosition;
 
-        //Calculate the middle position of the rectangle
-        Vector3 middle = (squareStartScreen + squareEndPos) / 2f;
+        //Calculate the middle position of the rectangle by using the two corners we have
+        Vector3 middle = (rectangleStartPos + rectangleEndPos) / 2f;
 
         //Set the middle position of the GUI rectangle
         selectionSquareTrans.position = middle;
 
         //Calculate the size of the rectangle
-        float sizeX = Mathf.Abs(squareStartScreen.x - squareEndPos.x);
-        float sizeY = Mathf.Abs(squareStartScreen.y - squareEndPos.y);
+        float sizeX = Mathf.Abs(rectangleStartPos.x - rectangleEndPos.x);
+        float sizeY = Mathf.Abs(rectangleStartPos.y - rectangleEndPos.y);
 
         //Set the size of the square
         selectionSquareTrans.sizeDelta = new Vector2(sizeX, sizeY);
@@ -362,8 +357,8 @@ public class SelectionSquare : MonoBehaviour
             i++;
         }
 
-        //Could we create a square?
-        hasCreatedSquare = false;
+        //Could we convert all GUI positions to 3d space?
+        hasCreatedRectangle = false;
 
         //We could find 4 points
         if (i == 4)
@@ -374,7 +369,7 @@ public class SelectionSquare : MonoBehaviour
             //sphere3.position = BL;
             //sphere4.position = BR;
 
-            hasCreatedSquare = true;
+            hasCreatedRectangle = true;
         }
     }
 }
