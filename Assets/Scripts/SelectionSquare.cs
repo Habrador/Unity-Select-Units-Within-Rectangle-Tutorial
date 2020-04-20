@@ -8,11 +8,7 @@ public class SelectionSquare : MonoBehaviour
     public GameObject[] allUnits;
     //The selection square we draw when we drag the mouse to select units
     public RectTransform selectionSquareTrans;
-    //To test the square's corners
-    public Transform sphere1;
-    public Transform sphere2;
-    public Transform sphere3;
-    public Transform sphere4;
+ 
     //The materials
     public Material normalMaterial;
     public Material highlightMaterial;
@@ -36,6 +32,12 @@ public class SelectionSquare : MonoBehaviour
     private bool hasCreatedRectangle;
     //The selection squares 4 corner positions
     private Vector3 TL, TR, BL, BR;
+
+    //The ground plane on which the units are located
+    //It's faster and simpler to raycast to this plane than using a plane GameObject
+    //because a Plane is infinite so we can be outside of the map and still select units 
+    //on the map
+    private Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
 
 
 
@@ -273,7 +275,7 @@ public class SelectionSquare : MonoBehaviour
 
 
 
-    //Is a point within a triangle
+    //Is a point within a triangle in xz space
     //From http://totologic.blogspot.se/2014/01/accurate-point-in-triangle-test.html
     bool IsWithinTriangle(Vector3 p, Vector3 p1, Vector3 p2, Vector3 p3)
     {
@@ -333,43 +335,42 @@ public class SelectionSquare : MonoBehaviour
         BR = new Vector3(middle.x + halfSizeX, middle.y - halfSizeY, 0f);
 
         //From screen to world
-        RaycastHit hit;
-        int i = 0;
+        Ray rayTL = Camera.main.ScreenPointToRay(TL);
+        Ray rayTR = Camera.main.ScreenPointToRay(TR);
+        Ray rayBL = Camera.main.ScreenPointToRay(BL);
+        Ray rayBR = Camera.main.ScreenPointToRay(BR);
+
+        float distanceToPlane = 0f;
+        
         //Fire ray from camera
-        if (Physics.Raycast(Camera.main.ScreenPointToRay(TL), out hit, 200f, 1 << 9))
+        if (groundPlane.Raycast(rayTL, out distanceToPlane))
         {
-            TL = hit.point;
-            i++;
+            TL = rayTL.GetPoint(distanceToPlane);
         }
-        if (Physics.Raycast(Camera.main.ScreenPointToRay(TR), out hit, 200f, 1 << 9))
+        if (groundPlane.Raycast(rayTR, out distanceToPlane))
         {
-            TR = hit.point;
-            i++;
+            TR = rayTR.GetPoint(distanceToPlane);
         }
-        if (Physics.Raycast(Camera.main.ScreenPointToRay(BL), out hit, 200f, 1 << 9))
+        if (groundPlane.Raycast(rayBL, out distanceToPlane))
         {
-            BL = hit.point;
-            i++;
+            BL = rayBL.GetPoint(distanceToPlane);
         }
-        if (Physics.Raycast(Camera.main.ScreenPointToRay(BR), out hit, 200f, 1 << 9))
+        if (groundPlane.Raycast(rayBR, out distanceToPlane))
         {
-            BR = hit.point;
-            i++;
+            BR = rayBR.GetPoint(distanceToPlane);
         }
 
-        //Could we convert all GUI positions to 3d space?
-        hasCreatedRectangle = false;
+        hasCreatedRectangle = true;
+    }
 
-        //We could find 4 points
-        if (i == 4)
-        {
-            //Display the corners for debug
-            //sphere1.position = TL;
-            //sphere2.position = TR;
-            //sphere3.position = BL;
-            //sphere4.position = BR;
 
-            hasCreatedRectangle = true;
-        }
+
+    //Debug the rectangles corners in world space
+    private void OnDrawGizmos()
+    {
+        //Gizmos.DrawSphere(TL, 1f);
+        //Gizmos.DrawSphere(TR, 1f);
+        //Gizmos.DrawSphere(BL, 1f);
+        //Gizmos.DrawSphere(BR, 1f);
     }
 }
