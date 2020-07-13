@@ -44,6 +44,9 @@ public class SelectionSquare : MonoBehaviour
     //because this plane is infinite so we dont have to care if we are outside of the ground plane
     private Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
 
+    //Have we clicked with left mouse or are we holding down left mouse
+    private bool hasClicked, isHoldingDown, hasReleased, isHovering = false;
+
 
 
     void Start()
@@ -56,22 +59,22 @@ public class SelectionSquare : MonoBehaviour
 
     void Update()
     {
-        //Select one or several units by clicking or dragging the mouse
-        SelectUnits();
-
-        //Highlight a single unit by hovering with mouse above a unit which is not selected
-        HighlightUnit();
+        //Have we clicked with left mouse or are we holding down left mouse
+        CheckInput();
+    
+        //Select (or highlight) one or several units with the mouse
+        InteractWithUnits();
     }
 
 
 
-    //Select units with click or by dragging left mouse button
-    void SelectUnits()
+    //Have we clicked with left mouse or are we holding down left mouse
+    private void CheckInput()
     {
-        //Have we clicked with left mouse or are we holding down left mouse
-        bool hasClicked = false;
-        bool isHoldingDown = false;
-        bool hasReleased = false;
+        hasClicked = false;
+        isHoldingDown = false;
+        hasReleased = false;
+        isHovering = false;
 
         //Press down left mouse button
         if (Input.GetMouseButtonDown(0))
@@ -100,8 +103,17 @@ public class SelectionSquare : MonoBehaviour
                 isHoldingDown = true;
             }
         }
+        else 
+        {
+            isHovering = true;
+        }
+    }
 
 
+
+    //Select units with click or by dragging left mouse button
+    void InteractWithUnits()
+    {
         //If we have clicked we want to: 
         //- deselect all units
         //- select a single unit if we click on it
@@ -189,27 +201,23 @@ public class SelectionSquare : MonoBehaviour
             }
         }
 
+
+        //We are hovering with the mouse, so we might want to highlight a unit
+        ResetTryHighlightUnit();
+
+        if (isHovering)
+        {
+            TryHighlightUnit();
+        }
+
         //Debug.Log($"Highlighted units: {highlightedUnits.Count}. Selected units: {selectedUnits.Count}");
     }
 
 
 
     //Highlight a single unit when mouse is above it
-    //Will also un-highlight a previously highlighted unit, or it will remain highlighted
-    void HighlightUnit()
-    {
-        //Un-highlight
-        if (previouslyHighlightedUnit != null)
-        {
-            //But we cant un-highlight it if we also selected it
-            if (!selectedUnits.Contains(previouslyHighlightedUnit))
-            {
-                previouslyHighlightedUnit.GetComponent<MeshRenderer>().sharedMaterial = normalMaterial;
-
-                previouslyHighlightedUnit = null;
-            }
-        }
-    
+    void TryHighlightUnit()
+    {        
         //Fire a ray from the camera to see if mouse is above a unit 
         if (Physics.Raycast(myCamera.ScreenPointToRay(Input.mousePosition), out RaycastHit hit, 200f))
         {
@@ -226,6 +234,23 @@ public class SelectionSquare : MonoBehaviour
 
                     previouslyHighlightedUnit = currentObj;
                 }
+            }
+        }
+    }
+
+
+    //Will un-highlight a previously highlighted unit, or it will remain highlighted
+    private void ResetTryHighlightUnit()
+    {
+        //Un-highlight
+        if (previouslyHighlightedUnit != null)
+        {
+            //But we cant un-highlight it if we also selected it
+            if (!selectedUnits.Contains(previouslyHighlightedUnit))
+            {
+                previouslyHighlightedUnit.GetComponent<MeshRenderer>().sharedMaterial = normalMaterial;
+
+                previouslyHighlightedUnit = null;
             }
         }
     }
