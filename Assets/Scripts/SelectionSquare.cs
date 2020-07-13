@@ -110,7 +110,7 @@ public class SelectionSquare : MonoBehaviour
             //Deselect all units
             for (int i = 0; i < selectedUnits.Count; i++)
             {
-                selectedUnits[i].GetComponent<MeshRenderer>().material = normalMaterial;
+                selectedUnits[i].GetComponent<MeshRenderer>().sharedMaterial = normalMaterial;
             }
 
             //Clear the list with selected units
@@ -127,7 +127,7 @@ public class SelectionSquare : MonoBehaviour
                     GameObject activeUnit = hit.collider.gameObject;
                     
                     //Set this unit to selected
-                    activeUnit.GetComponent<MeshRenderer>().material = selectedMaterial;
+                    activeUnit.GetComponent<MeshRenderer>().sharedMaterial = selectedMaterial;
                     
                     //Add it to the list of selected units, which is now just 1 unit
                     selectedUnits.Add(activeUnit);
@@ -140,7 +140,8 @@ public class SelectionSquare : MonoBehaviour
         if (isHoldingDown)
         {
             //Display the rectangle with a GUI image
-            DisplayRectangleAndGenerateSelectionPolygon();
+            //will also generate the corners of the polygon we use to test if a unit should be selected
+            GenerateDisplayRectangleAndSelectionPolygon();
 
             //Highlight the units within the selection rectangle, but don't select the units
             //We select them when we have released the mouse button
@@ -151,14 +152,14 @@ public class SelectionSquare : MonoBehaviour
                 //Is this unit within the rectangle
                 if (IsWithinPolygon(unit.transform.position))
                 {
-                    unit.GetComponent<MeshRenderer>().material = highlightMaterial;
+                    unit.GetComponent<MeshRenderer>().sharedMaterial = highlightMaterial;
 
                     highlightedUnits.Add(unit);
                 }
                 //Otherwise deselect
                 else
                 {
-                    unit.GetComponent<MeshRenderer>().material = normalMaterial;
+                    unit.GetComponent<MeshRenderer>().sharedMaterial = normalMaterial;
                 }
             }
         }
@@ -179,7 +180,7 @@ public class SelectionSquare : MonoBehaviour
                 //Select the units that are currently highlighted
                 foreach (GameObject unit in highlightedUnits)
                 {
-                    unit.GetComponent<MeshRenderer>().material = selectedMaterial;
+                    unit.GetComponent<MeshRenderer>().sharedMaterial = selectedMaterial;
 
                     selectedUnits.Add(unit);
                 }
@@ -203,7 +204,7 @@ public class SelectionSquare : MonoBehaviour
             //But we cant un-highlight it if we also selected it
             if (!selectedUnits.Contains(previouslyHighlightedUnit))
             {
-                previouslyHighlightedUnit.GetComponent<MeshRenderer>().material = normalMaterial;
+                previouslyHighlightedUnit.GetComponent<MeshRenderer>().sharedMaterial = normalMaterial;
 
                 previouslyHighlightedUnit = null;
             }
@@ -221,7 +222,7 @@ public class SelectionSquare : MonoBehaviour
                 //Highlight this unit if it's not selected
                 if (!selectedUnits.Contains(currentObj))
                 {
-                    currentObj.GetComponent<MeshRenderer>().material = highlightMaterial;
+                    currentObj.GetComponent<MeshRenderer>().sharedMaterial = highlightMaterial;
 
                     previouslyHighlightedUnit = currentObj;
                 }
@@ -280,7 +281,7 @@ public class SelectionSquare : MonoBehaviour
 
     //Display the selection with a UI rectangle
     //We will also use this UI rectangle to generate a 4-corner-polygon in world space
-    void DisplayRectangleAndGenerateSelectionPolygon()
+    void GenerateDisplayRectangleAndSelectionPolygon()
     {
         //Activate the border image
         if (!selectionSquareTrans.gameObject.activeInHierarchy)
