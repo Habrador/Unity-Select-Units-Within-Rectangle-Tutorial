@@ -1,6 +1,6 @@
-# Select units wuthin rectangle
+# Select units within rectangle
 
-Source code for Unity tutorial on how to select units within rectangle
+Source code for Unity tutorial on how to select units within rectangle. Notice that the code is not exactly as in the tutorial because I've learned one or two things but the idea is the same. The main difference you should change is that border of the selection square has to be 2 pixels wide, or you will see some flickering. 
 
 ![Closest point on line segment](/_media/select-units-within-square.png?raw=true)
 

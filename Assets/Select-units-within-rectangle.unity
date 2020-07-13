@@ -843,6 +843,7 @@ MonoBehaviour:
   normalMaterial: {fileID: 2100000, guid: 2cf022874327abd44b2f57dfe711dcb2, type: 2}
   highlightMaterial: {fileID: 2100000, guid: 089d799f94edf044b88f79e6b520cfd5, type: 2}
   selectedMaterial: {fileID: 2100000, guid: 02b44f486e844bf49862c45b5272725f, type: 2}
+  myCamera: {fileID: 534669904}
 --- !u!4 &777518871
 Transform:
   m_ObjectHideFlags: 0
@@ -1336,7 +1337,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: f69ad73b385f50f4db4a52f99f7e5773, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 8bc3d781f46395347ac6e654c4f53480, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 0

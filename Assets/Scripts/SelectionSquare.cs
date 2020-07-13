@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class SelectionSquare : MonoBehaviour
 {
+    //Public drags
+
     //Add all units in the scene to this array
     public GameObject[] allUnits;
     //The selection square we draw when we drag the mouse to select units
@@ -14,29 +16,32 @@ public class SelectionSquare : MonoBehaviour
     public Material highlightMaterial;
     public Material selectedMaterial;
 
-    //All currently selected units
-    [System.NonSerialized]
-    public List<GameObject> selectedUnits = new List<GameObject>();
+    //The camera we are using
+    public Camera myCamera;
 
-    //We have hovered above this unit, so we can deselect it next update
-    //and dont have to loop through all units
-    private GameObject highlightThisUnit;
+
+    //Private
+
+    //All currently selected units
+    private List<GameObject> selectedUnits = new List<GameObject>();
+    //All currently highlighted unit (are within the rectangle while dragging left mouse)
+    private List<GameObject> highlightedUnits = new List<GameObject>();
+    //If the mouse is above a unit, it should also be highlightet
+    //But we also have to un-highlight it the mouse is no longer above the unit
+    private GameObject previouslyHighlightedUnit;
 
     //To determine if we are clicking with left mouse or holding down left mouse
     private float delay = 0.3f;
-    private float clickTime = 0f;
+    private float timeWhenPressedLeftMouseButton = 0f;
 
-    //The start and end coordinates of the rectangle we are making
+    //The start and end coordinates of the rectangle we are making in screen space
     private Vector3 rectangleStartPos;
-    //If it was possible to create a rectangle
-    private bool hasCreatedRectangle;
-    //The selection squares 4 corner positions
+    //The selection rectangle's 4 corner positions in world space
     private Vector3 TL, TR, BL, BR;
 
     //The ground plane on which the units are located
-    //It's faster and simpler to raycast to this plane than using a plane GameObject
-    //because a Plane is infinite so we can be outside of the map and still select units 
-    //on the map
+    //It's faster and simpler to raycast to this plane than using a finite ground plane 
+    //because this plane is infinite so we dont have to care if we are outside of the ground plane
     private Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
 
 
@@ -51,7 +56,7 @@ public class SelectionSquare : MonoBehaviour
 
     void Update()
     {
-        //Select one or several units by clicking or draging the mouse
+        //Select one or several units by clicking or dragging the mouse
         SelectUnits();
 
         //Highlight a single unit by hovering with mouse above a unit which is not selected
@@ -60,7 +65,7 @@ public class SelectionSquare : MonoBehaviour
 
 
 
-    //Select units with click or by draging the mouse
+    //Select units with click or by dragging left mouse button
     void SelectUnits()
     {
         //Have we clicked with left mouse or are we holding down left mouse
@@ -71,7 +76,7 @@ public class SelectionSquare : MonoBehaviour
         //Press down left mouse button
         if (Input.GetMouseButtonDown(0))
         {
-            clickTime = Time.time;
+            timeWhenPressedLeftMouseButton = Time.time;
 
             //We dont yet know if we are drawing a rectangle, but we need the first coordinate in case we do draw a rectangle
             rectangleStartPos = Input.mousePosition;
@@ -79,7 +84,8 @@ public class SelectionSquare : MonoBehaviour
         //Release left mouse button
         else if (Input.GetMouseButtonUp(0))
         {
-            if (Time.time - clickTime <= delay)
+            //If we didn't hold down the left mouse button long enough, we say it's a click
+            if (Time.time - timeWhenPressedLeftMouseButton <= delay)
             {
                 hasClicked = true;
             }
@@ -89,16 +95,18 @@ public class SelectionSquare : MonoBehaviour
         //Hold down left mouse button
         else if (Input.GetMouseButton(0))
         {
-            if (Time.time - clickTime > delay)
+            if (Time.time - timeWhenPressedLeftMouseButton > delay)
             {
                 isHoldingDown = true;
             }
         }
 
 
-        //Select one unit and/or deselect currently selected units by clicking on what's not a unit
+        //If we have clicked we want to: 
+        //- deselect all units
+        //- select a single unit if we click on it
         if (hasClicked)
-        {
+        {        
             //Deselect all units
             for (int i = 0; i < selectedUnits.Count; i++)
             {
@@ -108,17 +116,19 @@ public class SelectionSquare : MonoBehaviour
             //Clear the list with selected units
             selectedUnits.Clear();
 
+
             //Try to select a new unit
-            RaycastHit hit;
             //Fire ray from camera
-            if (Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out hit, 200f))
+            if (Physics.Raycast(myCamera.ScreenPointToRay(Input.mousePosition), out RaycastHit hit, 200f))
             {
                 //Did we hit a friendly unit?
                 if (hit.collider.CompareTag("Friendly"))
                 {
                     GameObject activeUnit = hit.collider.gameObject;
+                    
                     //Set this unit to selected
                     activeUnit.GetComponent<MeshRenderer>().material = selectedMaterial;
+                    
                     //Add it to the list of selected units, which is now just 1 unit
                     selectedUnits.Add(activeUnit);
                 }
@@ -126,102 +136,81 @@ public class SelectionSquare : MonoBehaviour
         }
 
 
-        //Drag the mouse to select all units within the square
+        //If we drag the mouse we want to select all units within the rectangle
         if (isHoldingDown)
         {
             //Display the rectangle with a GUI image
-            DisplayRectangle();
+            DisplayRectangleAndGenerateSelectionPolygon();
 
-            //Highlight the units within the selection square, but don't select the units
+            //Highlight the units within the selection rectangle, but don't select the units
             //We select them when we have released the mouse button
-            if (hasCreatedRectangle)
-            {
-                for (int i = 0; i < allUnits.Length; i++)
-                {
-                    GameObject currentUnit = allUnits[i];
+            highlightedUnits.Clear();
 
-                    //Is this unit within the rectangle
-                    if (IsWithinPolygon(currentUnit.transform.position))
-                    {
-                        currentUnit.GetComponent<MeshRenderer>().material = highlightMaterial;
-                    }
-                    //Otherwise deactivate
-                    else
-                    {
-                        currentUnit.GetComponent<MeshRenderer>().material = normalMaterial;
-                    }
+            foreach (GameObject unit in allUnits)
+            {
+                //Is this unit within the rectangle
+                if (IsWithinPolygon(unit.transform.position))
+                {
+                    unit.GetComponent<MeshRenderer>().material = highlightMaterial;
+
+                    highlightedUnits.Add(unit);
+                }
+                //Otherwise deselect
+                else
+                {
+                    unit.GetComponent<MeshRenderer>().material = normalMaterial;
                 }
             }
         }
 
 
-        //We have released the mouse button and should select the units within the rectangle
+        //We have released the mouse button and should select the units within the rectangle (if we created a rectangle)
         if (hasReleased)
         {
-            //Select all units within the rectangle if we have created a rectangle
-            if (hasCreatedRectangle)
+            //Deactivate the rectangle selection image
+            selectionSquareTrans.gameObject.SetActive(false);
+
+            //Test if we should select highlighted units?
+            if (highlightedUnits.Count > 0)
             {
-                hasCreatedRectangle = false;
-
-                //Deactivate the square selection image
-                selectionSquareTrans.gameObject.SetActive(false);
-
-                //Clear the list with selected unit
+                //Clear the list with currently selected unit so we can select new units
                 selectedUnits.Clear();
 
-                //Select the units that are within the rectangle
-                for (int i = 0; i < allUnits.Length; i++)
+                //Select the units that are currently highlighted
+                foreach (GameObject unit in highlightedUnits)
                 {
-                    GameObject currentUnit = allUnits[i];
+                    unit.GetComponent<MeshRenderer>().material = selectedMaterial;
 
-                    //Is this unit within the rectangle
-                    if (IsWithinPolygon(currentUnit.transform.position))
-                    {
-                        currentUnit.GetComponent<MeshRenderer>().material = selectedMaterial;
-
-                        selectedUnits.Add(currentUnit);
-                    }
-                    //Otherwise deselect the unit if it's not in the rectangle
-                    else
-                    {
-                        currentUnit.GetComponent<MeshRenderer>().material = normalMaterial;
-                    }
+                    selectedUnits.Add(unit);
                 }
+
+                highlightedUnits.Clear();
             }
         }
+
+        //Debug.Log($"Highlighted units: {highlightedUnits.Count}. Selected units: {selectedUnits.Count}");
     }
 
 
 
-    //Highlight a unit when mouse is above it
+    //Highlight a single unit when mouse is above it
+    //Will also un-highlight a previously highlighted unit, or it will remain highlighted
     void HighlightUnit()
     {
-        //Change material on the latest unit we highlighted
-        if (highlightThisUnit != null)
+        //Un-highlight
+        if (previouslyHighlightedUnit != null)
         {
-            //But make sure the unit we want to change material on is not selected
-            bool isSelected = false;
-            for (int i = 0; i < selectedUnits.Count; i++)
+            //But we cant un-highlight it if we also selected it
+            if (!selectedUnits.Contains(previouslyHighlightedUnit))
             {
-                if (selectedUnits[i] == highlightThisUnit)
-                {
-                    isSelected = true;
-                    break;
-                }
-            }
+                previouslyHighlightedUnit.GetComponent<MeshRenderer>().material = normalMaterial;
 
-            if (!isSelected)
-            {
-                highlightThisUnit.GetComponent<MeshRenderer>().material = normalMaterial;
+                previouslyHighlightedUnit = null;
             }
-
-            highlightThisUnit = null;
         }
-
-        //Fire a ray from the mouse position to get the unit we want to highlight
-        RaycastHit hit;
-        //Fire ray from camera
-        if (Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out hit, 200f))
+    
+        //Fire a ray from the camera to see if mouse is above a unit 
+        if (Physics.Raycast(myCamera.ScreenPointToRay(Input.mousePosition), out RaycastHit hit, 200f))
         {
             //Did we hit a friendly unit?
             if (hit.collider.CompareTag("Friendly"))
@@ -230,21 +219,11 @@ public class SelectionSquare : MonoBehaviour
                 GameObject currentObj = hit.collider.gameObject;
 
                 //Highlight this unit if it's not selected
-                bool isSelected = false;
-                for (int i = 0; i < selectedUnits.Count; i++)
+                if (!selectedUnits.Contains(currentObj))
                 {
-                    if (selectedUnits[i] == currentObj)
-                    {
-                        isSelected = true;
-                        break;
-                    }
-                }
+                    currentObj.GetComponent<MeshRenderer>().material = highlightMaterial;
 
-                if (!isSelected)
-                {
-                    highlightThisUnit = currentObj;
-
-                    highlightThisUnit.GetComponent<MeshRenderer>().material = highlightMaterial;
+                    previouslyHighlightedUnit = currentObj;
                 }
             }
         }
@@ -252,7 +231,7 @@ public class SelectionSquare : MonoBehaviour
 
 
 
-    //Is a unit within a polygon determined by 4 corners
+    //Is a unit within a polygon with 4 corners
     bool IsWithinPolygon(Vector3 unitPos)
     {
         bool isWithinPolygon = false;
@@ -299,8 +278,9 @@ public class SelectionSquare : MonoBehaviour
 
 
 
-    //Display the selection with a GUI rectangle
-    void DisplayRectangle()
+    //Display the selection with a UI rectangle
+    //We will also use this UI rectangle to generate a 4-corner-polygon in world space
+    void DisplayRectangleAndGenerateSelectionPolygon()
     {
         //Activate the border image
         if (!selectionSquareTrans.gameObject.activeInHierarchy)
@@ -308,7 +288,7 @@ public class SelectionSquare : MonoBehaviour
             selectionSquareTrans.gameObject.SetActive(true);
         }
 
-        //Get the a corner coordinate of the rectangle, which is where the mouse currently is
+        //Get a corner coordinate of the rectangle, which is where the mouse currently is
         Vector3 rectangleEndPos = Input.mousePosition;
 
         //Calculate the middle position of the rectangle by using the two corners we have
@@ -326,23 +306,24 @@ public class SelectionSquare : MonoBehaviour
 
         //The problem is that the corners in the 2d rectangle is not the same as in 3d space
         //To get corners, we have to fire 4 rays from the screen and see where they hit the ground
+        //These 4 corners will form a polygon, and we will see if a unit is within this polygon 
         float halfSizeX = sizeX * 0.5f;
         float halfSizeY = sizeY * 0.5f;
 
-        TL = new Vector3(middle.x - halfSizeX, middle.y + halfSizeY, 0f);
-        TR = new Vector3(middle.x + halfSizeX, middle.y + halfSizeY, 0f);
-        BL = new Vector3(middle.x - halfSizeX, middle.y - halfSizeY, 0f);
-        BR = new Vector3(middle.x + halfSizeX, middle.y - halfSizeY, 0f);
+        Vector3 TL_screenSpace = new Vector3(middle.x - halfSizeX, middle.y + halfSizeY, 0f);
+        Vector3 TR_screenSpace = new Vector3(middle.x + halfSizeX, middle.y + halfSizeY, 0f);
+        Vector3 BL_screenSpace = new Vector3(middle.x - halfSizeX, middle.y - halfSizeY, 0f);
+        Vector3 BR_screenSpace = new Vector3(middle.x + halfSizeX, middle.y - halfSizeY, 0f);
 
         //From screen to world
-        Ray rayTL = Camera.main.ScreenPointToRay(TL);
-        Ray rayTR = Camera.main.ScreenPointToRay(TR);
-        Ray rayBL = Camera.main.ScreenPointToRay(BL);
-        Ray rayBR = Camera.main.ScreenPointToRay(BR);
+        Ray rayTL = myCamera.ScreenPointToRay(TL_screenSpace);
+        Ray rayTR = myCamera.ScreenPointToRay(TR_screenSpace);
+        Ray rayBL = myCamera.ScreenPointToRay(BL_screenSpace);
+        Ray rayBR = myCamera.ScreenPointToRay(BR_screenSpace);
 
         float distanceToPlane = 0f;
         
-        //Fire ray from camera
+        //Fire ray from camera to get the corners in world space
         if (groundPlane.Raycast(rayTL, out distanceToPlane))
         {
             TL = rayTL.GetPoint(distanceToPlane);
@@ -360,7 +341,7 @@ public class SelectionSquare : MonoBehaviour
             BR = rayBR.GetPoint(distanceToPlane);
         }
 
-        hasCreatedRectangle = true;
+        //hasCreatedRectangle = true;
     }
 
 
